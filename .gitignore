@@ -1,0 +1,14 @@
+Thumbs.db
+Desktop.ini
+
+*.log
+
+.vscode/
+.idea/
+
+bin/
+obj/
+
+*.tmp
+
+.DS_Store
