@@ -28,12 +28,20 @@ jobs:
               Install-Module -Name $ModuleName -Force -AllowClobber -Scope CurrentUser
           }
 
-          # 2. Run analysis targeting the scripts directory
-          Write-Host "Scanning repository code patterns..." -ForegroundColor Cyan
-          $TargetRules = @{ Path = "./scripts/"; Severity = @('Error', 'Warning'); Recurse = $true }
-          $Issues = Invoke-ScriptAnalyzer @TargetRules
+          # 2. Dynamic Discovery of all PowerShell scripts to prevent missing path crashes
+          Write-Host "Discovering target PowerShell scripts..." -ForegroundColor Cyan
+          $AllScripts = Get-ChildItem -Path "." -Recurse -Include "*.ps1", "*.psm1" | Select-Object -ExpandProperty FullName
 
-          # 3. Process telemetry results
+          if (-not $AllScripts) {
+              Write-Host "ℹ️ No PowerShell script files found in this repository workspace. Skipping analysis." -ForegroundColor Yellow
+              exit 0
+          }
+
+          # 3. Run analysis targeting explicitly discovered file paths
+          Write-Host "Scanning discovered code patterns via PSScriptAnalyzer..." -ForegroundColor Cyan
+          $Issues = Invoke-ScriptAnalyzer -Path $AllScripts -Severity @('Error', 'Warning')
+
+          # 4. Process telemetry results
           if ($Issues) {
               $Issues | ForEach-Object {
                   $FormattedMessage = "[$($_.Severity)] $($_.Message) (Line: $($_.Line), Rule: $($_.RuleName), File: $($_.ScriptName))"
@@ -50,5 +58,5 @@ jobs:
                   exit 1
               }
           } else {
-              Write-Host "Automation Verified: Zero code style issues detected!" -ForegroundColor Green
+              Write-Host "🎉 Automation Verified: Zero code style issues detected!" -ForegroundColor Green
           }
