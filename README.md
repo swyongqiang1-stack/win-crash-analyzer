@@ -1,0 +1,1 @@
+# win-crash-analyzer
