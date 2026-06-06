@@ -1,0 +1,54 @@
+name: Lint PowerShell Code
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Run PSScriptAnalyzer
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Execute Static Code Analysis
+        shell: pwsh
+        run: |
+          # 1. Ensure the official PSScriptAnalyzer module is present
+          $ModuleName = "PSScriptAnalyzer"
+          if (-not (Get-Module -ListAvailable -Name $ModuleName)) {
+              Write-Host "Installing PSScriptAnalyzer module..." -ForegroundColor Cyan
+              Install-Module -Name $ModuleName -Force -AllowClobber -Scope CurrentUser
+          }
+
+          # 2. Run analysis targeting the scripts directory
+          Write-Host "Scanning repository code patterns..." -ForegroundColor Cyan
+          $TargetRules = @{ Path = "./scripts/"; Severity = @('Error', 'Warning'); Recurse = $true }
+          $Issues = Invoke-ScriptAnalyzer @TargetRules
+
+          # 3. Process telemetry results
+          if ($Issues) {
+              $Issues | ForEach-Object {
+                  $FormattedMessage = "[$($_.Severity)] $($_.Message) (Line: $($_.Line), Rule: $($_.RuleName), File: $($_.ScriptName))"
+                  if ($_.Severity -eq 'Error') {
+                      Write-Error $FormattedMessage
+                  } else {
+                      Write-Warning $FormattedMessage
+                  }
+              }
+              
+              # Break the pipeline build explicitly if structural Errors exist
+              if ($Issues | Where-Object { $_.Severity -eq 'Error' }) {
+                  Write-Host "##[error] Pipeline failed due to severe syntax or logical errors."
+                  exit 1
+              }
+          } else {
+              Write-Host "Automation Verified: Zero code style issues detected!" -ForegroundColor Green
+          }
